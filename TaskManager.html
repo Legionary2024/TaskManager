@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>任务管理看板 - 软件工程课程实践</title>
+<style>
+  /* ============ 主题变量：浅色 / 深色 ============ */
+  :root {
+    --bg: #f1f5f9;
+    --bg-soft: #e2e8f0;
+    --surface: #ffffff;
+    --surface-hover: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-sub: #64748b;
+    --text-faint: #94a3b8;
+    --primary: #0ea5e9;
+    --primary-hover: #0284c7;
+    --danger: #ef4444;
+    --danger-bg: #fef2f2;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-hover: 0 8px 16px rgba(15, 23, 42, 0.12);
+  }
+  html.dark {
+    --bg: #0f172a;
+    --bg-soft: #1e293b;
+    --surface: #334155;
+    --surface-hover: #3b4a63;
+    --border: #475569;
+    --text: #f1f5f9;
+    --text-sub: #cbd5e1;
+    --text-faint: #94a3b8;
+    --danger-bg: rgba(239, 68, 68, 0.12);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-hover: 0 8px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  /* ============ 全局 ============ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.25s, color 0.25s;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--text-faint); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ============ 页头 ============ */
+  header.app-header {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    max-width: 1152px; margin: 0 auto; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand-logo {
+    width: 40px; height: 40px; flex: none; border-radius: 12px;
+    background: var(--primary); color: #fff; font-size: 18px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-title { font-size: 17px; font-weight: 700; line-height: 1.3; }
+  .brand-sub { font-size: 12px; color: var(--text-faint); margin-top: 1px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-sub); transition: background 0.15s, color 0.15s;
+  }
+  .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .btn-primary {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--primary); color: #fff;
+    font-size: 14px; font-weight: 600;
+    padding: 10px 16px; border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary svg { width: 16px; height: 16px; }
+
+  /* ============ 看板 ============ */
+  main.board-wrap { max-width: 1152px; margin: 0 auto; padding: 20px; }
+  .board {
+    display: grid; grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  @media (min-width: 768px) {
+    .board { grid-template-columns: repeat(3, 1fr); align-items: start; }
+  }
+  .column {
+    background: var(--bg-soft);
+    border-radius: 16px; padding: 12px;
+    min-height: 60vh;
+    transition: box-shadow 0.15s, outline 0.15s;
+  }
+  .column.drop-target {
+    box-shadow: 0 0 0 3px var(--primary);
+  }
+  .col-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 10px; }
+  .col-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+  .dot.todo { background: #0ea5e9; }        /* 待办：蓝 */
+  .dot.doing { background: #f59e0b; }       /* 进行中：琥珀 */
+  .dot.done { background: #10b981; }        /* 完成：绿 */
+  .count {
+    background: color-mix(in srgb, var(--text) 12%, transparent);
+    color: var(--text-sub); font-size: 12px; font-weight: 500;
+    padding: 1px 8px; border-radius: 999px;
+  }
+  .col-add {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-faint); transition: background 0.15s, color 0.15s;
+  }
+  .col-add:hover { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+  .col-add svg { width: 16px; height: 16px; }
+
+  .card-list { display: flex; flex-direction: column; gap: 12px; }
+  .empty-tip {
+    border: 2px dashed color-mix(in srgb, var(--text) 20%, transparent);
+    border-radius: 12px; color: var(--text-faint); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 120px; text-align: center; padding: 16px;
+  }
+
+  /* ============ 任务卡片 ============ */
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px;
+    box-shadow: var(--shadow);
+    cursor: grab;
+    transition: box-shadow 0.15s, transform 0.1s;
+  }
+  .task-card:hover { box-shadow: var(--shadow-hover); }
+  .task-card.dragging { opacity: 0.45; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 6px;
+  }
+  .badge .dot { width: 6px; height: 6px; }
+  .badge-high { background: #fee2e2; color: #b91c1c; }        /* 高：红 */
+  .badge-medium { background: #fef3c7; color: #b45309; }      /* 中：黄 */
+  .badge-low { background: #d1fae5; color: #047857; }         /* 低：绿 */
+  html.dark .badge-high { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+  html.dark .badge-medium { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+  html.dark .badge-low { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+  .badge-status {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-sub); font-size: 11px; font-weight: 500;
+    padding: 2px 8px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .card-title { font-size: 14px; font-weight: 600; line-height: 1.5; word-break: break-word; }
+  .card-title.done { text-decoration: line-through; color: var(--text-faint); }
+  .card-desc { margin-top: 6px; font-size: 12px; line-height: 1.6; color: var(--text-sub); word-break: break-word; }
+  .card-actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: 10px; }
+  .act-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-faint); transition: background 0.15s, color 0.15s;
+    opacity: 0.85;
+  }
+  .act-btn:hover { background: var(--surface-hover); color: var(--text); }
+  .act-btn.danger:hover { background: var(--danger-bg); color: var(--danger); }
+  .act-btn svg { width: 15px; height: 15px; }
+
+  /* ============ 弹窗 ============ */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .modal {
+    width: 100%; max-width: 440px;
+    background: var(--surface); color: var(--text);
+    border-radius: 16px; padding: 22px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .modal-head h2 { font-size: 17px; font-weight: 700; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .form-label .req { color: var(--danger); }
+  .form-input {
+    width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25); }
+  textarea.form-input { resize: none; }
+  .form-error { margin-top: 6px; font-size: 12px; color: var(--danger); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .seg-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 6px; font-size: 13px; color: var(--text-sub);
+    transition: all 0.15s;
+  }
+  .seg-btn:hover { border-color: color-mix(in srgb, var(--text) 40%, transparent); }
+  .seg-btn.active {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary); font-weight: 600;
+  }
+  html.dark .seg-btn.active { color: #7dd3fc; }
+  .seg-btn .dot { width: 8px; height: 8px; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+  .btn-ghost {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 16px; font-size: 14px; color: var(--text-sub);
+    transition: background 0.15s;
+  }
+  .btn-ghost:hover { background: var(--surface-hover); color: var(--text); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <!-- ===================== 页头 ===================== -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo">任</div>
+        <div>
+          <div class="brand-title">任务管理看板</div>
+          <div class="brand-sub">软件工程课程实践 · Agentic 开发</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeBtn" class="icon-btn" title="切换深色模式" aria-label="切换深色模式"></button>
+        <button id="newTaskBtn" class="btn-primary">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          <span>新建任务</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== 看板 ===================== -->
+  <main class="board-wrap">
+    <div id="board" class="board"></div>
+  </main>
+
+  <!-- ===================== 新建/编辑弹窗 ===================== -->
+  <div id="modalBackdrop" class="modal-backdrop hidden">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h2 id="modalTitle">新建任务</h2>
+        <button id="closeModalBtn" class="act-btn" title="关闭" aria-label="关闭">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="taskForm" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="titleInput">标题 <span class="req">*</span></label>
+          <input id="titleInput" class="form-input" type="text" placeholder="请输入任务标题" autocomplete="off" />
+          <div id="titleError" class="form-error hidden">标题为必填项</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="descInput">描述</label>
+          <textarea id="descInput" class="form-input" rows="3" placeholder="选填：补充任务详情"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">状态</label>
+          <div class="seg" id="statusSeg">
+            <button type="button" class="seg-btn" data-status="todo">
+              <span class="dot todo"></span>待办
+            </button>
+            <button type="button" class="seg-btn" data-status="doing">
+              <span class="dot doing"></span>进行中
+            </button>
+            <button type="button" class="seg-btn" data-status="done">
+              <span class="dot done"></span>完成
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">优先级</label>
+          <div class="seg" id="prioritySeg">
+            <button type="button" class="seg-btn" data-priority="high">
+              <span class="dot" style="background:#ef4444"></span>高
+            </button>
+            <button type="button" class="seg-btn" data-priority="medium">
+              <span class="dot" style="background:#f59e0b"></span>中
+            </button>
+            <button type="button" class="seg-btn" data-priority="low">
+              <span class="dot" style="background:#10b981"></span>低
+            </button>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" id="cancelBtn" class="btn-ghost">取消</button>
+          <button type="submit" class="btn-primary" id="submitBtn">创建任务</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * 任务管理看板 · 纯网页版（零依赖，双击 index.html 即可运行）
+ * 功能：任务增删改查 / 三状态看板 / 三档优先级(高红中黄低绿) /
+ *       拖拽改状态 / 深色模式记忆 / localStorage 持久化
+ * ===================================================================== */
+(function () {
+  const STORAGE_KEY = 'task-manager:tasks';
+  const THEME_KEY = 'task-manager:theme';
+
+  const STATUSES = [
+    { value: 'todo', label: '待办' },
+    { value: 'doing', label: '进行中' },
+    { value: 'done', label: '完成' }
+  ];
+  const PRIORITIES = [
+    { value: 'high', label: '高' },
+    { value: 'medium', label: '中' },
+    { value: 'low', label: '低' }
+  ];
+
+  /* ---------------- DOM 引用 ---------------- */
+  const board = document.getElementById('board');
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalTitle = document.getElementById('modalTitle');
+  const submitBtn = document.getElementById('submitBtn');
+  const taskForm = document.getElementById('taskForm');
+  const titleInput = document.getElementById('titleInput');
+  const descInput = document.getElementById('descInput');
+  const titleError = document.getElementById('titleError');
+  const statusSeg = document.getElementById('statusSeg');
+  const prioritySeg = document.getElementById('prioritySeg');
+  const themeBtn = document.getElementById('themeBtn');
+
+  /* ---------------- 状态 ---------------- */
+  let tasks = loadTasks();
+  let editingId = null;       // null = 新建，有值 = 编辑
+  let formStatus = 'todo';    // 当前弹窗选择的 状态/优先级
+  let formPriority = 'medium';
+  let applyDark = false;
+
+  /* ---------------- 工具函数 ---------------- */
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  }
+  function loadTasks() {
+    const seed = [
+      { id: genId() + '-s1', title: '梳理课程实践需求', description: '确认任务增删改查、三状态看板、优先级与深色模式等核心功能。', status: 'todo', priority: 'high' },
+      { id: genId() + '-s2', title: '搭建纯网页版应用', description: '不依赖任何构建工具，双击 index.html 直接运行。', status: 'doing', priority: 'medium' },
+      { id: genId() + '-s3', title: '确认技术方案', description: '原生 HTML + CSS + JS + localStorage。', status: 'done', priority: 'low' }
+    ];
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return seed;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : seed;
+    } catch (e) {
+      return seed;
+    }
+  }
+
+  /* ---------------- 增删改查 ---------------- */
+  function addTask({ title, description = '', status = 'todo', priority = 'medium' }) {
+    const task = {
+      id: genId(),
+      title: title.trim(),
+      description: (description || '').trim(),
+      status: status,
+      priority: priority
+    };
+    tasks.push(task);
+    save();
+    return task;
+  }
+  function updateTask(id, patch) {
+    const t = tasks.find((x) => x.id === id);
+    if (!t) return null;
+    Object.assign(t, patch);
+    save();
+    return t;
+  }
+  function removeTask(id) {
+    const idx = tasks.findIndex((x) => x.id === id);
+    if (idx !== -1) {
+      tasks.splice(idx, 1);
+      save();
+    }
+  }
+  function moveTask(id, status) {
+    const t = tasks.find((x) => x.id === id);
+    if (t && t.status !== status) {
+      t.status = status;
+      save();
+      renderBoard();
+    }
+  }
+  function priorityOf(task) {
+    return PRIORITIES.find((p) => p.value === task.priority) || PRIORITIES[1];
+  }
+
+  /* ---------------- 渲染：看板 ---------------- */
+  function renderBoard() {
+    board.innerHTML = '';
+    STATUSES.forEach((s) => {
+      board.appendChild(renderColumn(s));
+    });
+  }
+
+  function renderColumn(statusInfo) {
+    const colTasks = tasks.filter((t) => t.status === statusInfo.value);
+    const col = document.createElement('section');
+    col.className = 'column';
+    col.dataset.status = statusInfo.value;
+
+    // 列头
+    const head = document.createElement('header');
+    head.className = 'col-head';
+    const title = document.createElement('div');
+    title.className = 'col-title';
+    const dot = document.createElement('span');
+    dot.className = 'dot ' + statusInfo.value;
+    const label = document.createElement('span');
+    label.textContent = statusInfo.label;
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = colTasks.length;
+    title.append(dot, label, count);
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'col-add';
+    addBtn.title = '添加任务到「' + statusInfo.label + '」';
+    addBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>';
+    addBtn.addEventListener('click', () => openModal(null, statusInfo.value));
+    head.append(title, addBtn);
+
+    // 卡片列表
+    const list = document.createElement('div');
+    list.className = 'card-list';
+    if (colTasks.length === 0) {
+      const tip = document.createElement('div');
+      tip.className = 'empty-tip';
+      tip.textContent = '拖拽任务到此列';
+      list.appendChild(tip);
+    } else {
+      colTasks.forEach((t) => list.appendChild(renderCard(t)));
+    }
+
+    // 拖拽落点
+    col.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      col.classList.add('drop-target');
+    });
+    col.addEventListener('dragleave', () => {
+      col.classList.remove('drop-target');
+    });
+    col.addEventListener('drop', (e) => {
+      e.preventDefault();
+      col.classList.remove('drop-target');
+      const id = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+      if (id) moveTask(id, statusInfo.value);
+    });
+
+    col.append(head, list);
+    return col;
+  }
+
+  function renderCard(task) {
+    const card = document.createElement('article');
+    card.className = 'task-card';
+    card.draggable = true;
+    card.dataset.taskId = task.id;
+    card.addEventListener('dragstart', (e) => {
+      card.classList.add('dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', task.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+    });
+
+    // 顶部徽标行：优先级 + 状态
+    const top = document.createElement('div');
+    top.className = 'card-top';
+    const prio = priorityOf(task);
+    const prioBadge = document.createElement('span');
+    prioBadge.className = 'badge badge-' + prio.value;
+    const prioDot = document.createElement('span');
+    prioDot.className = 'dot';
+    prioDot.style.background = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }[prio.value];
+    prioBadge.appendChild(prioDot);
+    prioBadge.appendChild(document.createTextNode(prio.label + '优先级'));
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'badge-status';
+    const sDot = document.createElement('span');
+    sDot.className = 'dot ' + task.status;
+    statusBadge.appendChild(sDot);
+    statusBadge.appendChild(document.createTextNode(STATUSES.find((s) => s.value === task.status)?.label || task.status));
+    top.append(prioBadge, statusBadge);
+
+    // 标题 / 描述
+    const title = document.createElement('h3');
+    title.className = 'card-title' + (task.status === 'done' ? ' done' : '');
+    title.textContent = task.title;
+
+    const desc = document.createElement('p');
+    if (task.description && task.description.trim()) {
+      desc.className = 'card-desc';
+      desc.textContent = task.description;
+    }
+
+    // 操作按钮
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'act-btn';
+    editBtn.title = '编辑任务';
+    editBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>';
+    editBtn.addEventListener('click', () => openModal(task, task.status));
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'act-btn danger';
+    delBtn.title = '删除任务';
+    delBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>';
+    delBtn.addEventListener('click', () => {
+      removeTask(task.id);
+      renderBoard();
+    });
+    actions.append(editBtn, delBtn);
+
+    card.append(top, title);
+    if (desc.textContent) card.appendChild(desc);
+    card.appendChild(actions);
+    return card;
+  }
+
+  /* ---------------- 弹窗：新建 / 编辑 ---------------- */
+  function openModal(task, presetStatus) {
+    editingId = task ? task.id : null;
+    modalTitle.textContent = task ? '编辑任务' : '新建任务';
+    submitBtn.textContent = task ? '保存修改' : '创建任务';
+    titleError.classList.add('hidden');
+    titleInput.value = task ? task.title : '';
+    descInput.value = task ? task.description || '' : '';
+    setSeg(statusSeg, 'data-status', task ? task.status : (presetStatus || 'todo'));
+    setSeg(prioritySeg, 'data-priority', task ? task.priority : 'medium');
+    modalBackdrop.classList.remove('hidden');
+    titleInput.focus();
+  }
+  function closeModal() {
+    modalBackdrop.classList.add('hidden');
+    editingId = null;
+  }
+  function setSeg(segEl, attr, value) {
+    [...segEl.querySelectorAll('.seg-btn')].forEach((btn) => {
+      const active = btn.getAttribute(attr) === value;
+      btn.classList.toggle('active', active);
+      if (active) {
+        if (attr === 'data-status') formStatus = value;
+        else formPriority = value;
+      }
+    });
+  }
+
+  // 状态 / 优先级选择
+  statusSeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    setSeg(statusSeg, 'data-status', btn.getAttribute('data-status'));
+  });
+  prioritySeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    setSeg(prioritySeg, 'data-priority', btn.getAttribute('data-priority'));
+  });
+
+  // 提交
+  function handleSubmit(e) {
+    e.preventDefault();
+    const title = titleInput.value.trim();
+    if (!title) {
+      titleError.classList.remove('hidden');
+      titleInput.focus();
+      return;
+    }
+    titleError.classList.add('hidden');
+    const payload = {
+      title: title,
+      description: descInput.value.trim(),
+      status: formStatus,
+      priority: formPriority
+    };
+    if (editingId) {
+      updateTask(editingId, payload);
+    } else {
+      addTask(payload);
+    }
+    closeModal();
+    renderBoard();
+  }
+  taskForm.addEventListener('submit', handleSubmit);
+  titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
+
+  document.getElementById('newTaskBtn').addEventListener('click', () => openModal(null, 'todo'));
+  document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', (e) => {
+    if (e.target === modalBackdrop) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modalBackdrop.classList.contains('hidden')) closeModal();
+  });
+
+  /* ---------------- 深色模式：切换 + 记忆 ---------------- */
+  function applyTheme() {
+    document.documentElement.classList.toggle('dark', applyDark);
+    themeBtn.innerHTML = applyDark
+      ? '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>'
+      : '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg>';
+    themeBtn.title = applyDark ? '切换到浅色模式' : '切换到深色模式';
+  }
+  themeBtn.addEventListener('click', () => {
+    applyDark = !applyDark;
+    localStorage.setItem(THEME_KEY, applyDark ? 'dark' : 'light');
+    applyTheme();
+  });
+
+  /* ---------------- 初始化 ---------------- */
+  applyDark = localStorage.getItem(THEME_KEY) === 'dark';
+  applyTheme();
+  renderBoard();
+})();
+</script>
+</body>
+</html>
